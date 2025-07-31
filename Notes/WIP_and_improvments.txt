@@ -1,0 +1,7 @@
+1. Need to add date and time of the generated file to easily find and store recordings.
+2. Need to have a feature of outputting both languages at the same time (for customers who want both languages).
+3. Currently working on exclusion of specified text using '[[excluded text]]' from both Greek and English language and vice versa.
+4. Better voice (more natural)
+5. Make Python script an API with options for web GUI
+6. Make sure there is no text limit
+7. Bit rate and PBX compatible
