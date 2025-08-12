@@ -9,6 +9,7 @@ most of the commands are coming from those libraries
 I am also running it in a venv with python 3.13.5
 
 '''
+import datetime
 import asyncio
 import edge_tts
 from langcodes import Language
@@ -19,7 +20,7 @@ import re
 # Choice of the library of the voices available (can add other ones also)
 VOICES = {
     # English
-    "en-US-AnaNeural": {
+    "en-US-EmmaNeural": {
         "language": "en",
         "gender": "Female",
         "locale": "en-US"
@@ -111,33 +112,90 @@ async def generate_speech():
     # Get speech rate
     rate = speech_rate()
 
-    
-    if voice_details['language'] != 'en':
-        lang_name = Language.get(voice_details['language']).display_name()
-        print(f"\nTranslating to {lang_name} (skipping [[bracketed]] parts)...")
+#...........................................................................................
+# New export feature for exporting both Greek and English audio files based on the selected
+# Written by Shaffer Patchias
+#...........................................................................................
 
-        # Function i found that will help to translate the given text to another language taken from the list
-        # User will choose the language he wants the audio to be in and after providing the text the respected text
-        # will be translated to the chosen language
-        translated = translate_with_skip(text, voice_details['language'])
+    # Ask if user wants both Greek and English audio files for the selected voice gender
+    export_both = input("\nExport both Greek and English audio files for this gender? (y/n): ").strip().lower() == 'y'
 
-        # Printing the translated text and the original one
-        print(f"Original: {text}")
-        print(f"Translated: {translated}")
-        text_to_speak = translated
-    else:
-        text_to_speak = text
-
-    # this will put the audio file into the downloads folder of the user
-    communicate = edge_tts.Communicate(text=text_to_speak, voice=voice_id, rate=rate)
     downloads_path = Path.home() / 'Downloads'
-    output_file = downloads_path / f"output_{voice_details['language']}_{voice_details['gender']}.wav"
-     #confirmation of the file and the name of the file to be generated
-    print(f"\nGenerating {voice_details['gender'].lower()} speech in "
-          f"{Language.get(voice_details['language']).display_name()}...")
-    await communicate.save(output_file)
-    print(f"Audio saved to: {output_file}")
 
+    async def save_audio(text, voice_id, voice_details):
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        communicate = edge_tts.Communicate(text=text, voice=voice_id, rate=rate)
+        output_file = downloads_path / f"output_{voice_details['language']}__{voice_details['gender']}__{timestamp}.wav"
+        print(f"\nGenerating {voice_details['gender'].lower()} speech in "
+              f"{Language.get(voice_details['language']).display_name()}...")
+        await communicate.save(output_file)
+        print(f"Audio saved to: {output_file}")
+
+    if export_both:
+        # Find English and Greek voices of the selected gender
+        english_voice = next((v for v, d in VOICES.items() if d['language'] == 'en' and d['gender'] == voice_details['gender']), None)
+        greek_voice = next((v for v, d in VOICES.items() if d['language'] == 'el' and d['gender'] == voice_details['gender']), None)
+
+        if english_voice:
+            print(f"\nGenerating English audio...")
+            await save_audio(text, english_voice, VOICES[english_voice])
+        else:
+            print("No English voice available for this gender.")
+        
+        if greek_voice:
+            print("\nPreparintg Greek audio (translating text, skipping [[bracketed]] parts)...")
+            translated = translate_with_skip(text, 'el')
+            print(f"Original: {text}")
+            print(f"Translated: {translated}")
+            await save_audio(translated, greek_voice, VOICES[greek_voice])
+        else:
+            print("No Greek voice found for this gender.")
+    
+    else:
+        if voice_details['language'] == 'en':
+            lang_name = Language.get(voice_details['language']).display_name()
+            print(f"\nTranslating to {lang_name} (skipping [[bracketed]] parts)...")
+            translated = translate_with_skip(text, voice_details['language'])
+            print(f"Original: {text}")
+            print(f"Translated: {translated}")
+            text_to_speak = translated
+        else:
+            text_to_speak = text
+        await save_audio(text_to_speak, voice_id, voice_details)
 if __name__ == "__main__":
-    #asynchio needed because the edge-tts is run asynchronously and need to be run inside a asyncio loop to run without errors
+    # asyncio needed because edge-tts runs asynchronously and needs to be run inside an asyncio loop
     asyncio.run(generate_speech())
+
+'''
+Older file export function
+Written by Andreas Karpasitis
+'''
+#     if voice_details['language'] != 'en':
+#         lang_name = Language.get(voice_details['language']).display_name()
+#         print(f"\nTranslating to {lang_name} (skipping [[bracketed]] parts)...")
+
+#         # Function i found that will help to translate the given text to another language taken from the list
+#         # User will choose the language he wants the audio to be in and after providing the text the respected text
+#         # will be translated to the chosen language
+#         translated = translate_with_skip(text, voice_details['language'])
+
+#         # Printing the translated text and the original one
+#         print(f"Original: {text}")
+#         print(f"Translated: {translated}")
+#         text_to_speak = translated
+#     else:
+#         text_to_speak = text
+
+#     # this will put the audio file into the downloads folder of the user
+#     communicate = edge_tts.Communicate(text=text_to_speak, voice=voice_id, rate=rate)
+#     downloads_path = Path.home() / 'Downloads'
+#     output_file = downloads_path / f"output_{voice_details['language']}_{voice_details['gender']}.wav"
+#      #confirmation of the file and the name of the file to be generated
+#     print(f"\nGenerating {voice_details['gender'].lower()} speech in "
+#           f"{Language.get(voice_details['language']).display_name()}...")
+#     await communicate.save(output_file)
+#     print(f"Audio saved to: {output_file}")
+
+# if __name__ == "__main__":
+#     #asynchio needed because the edge-tts is run asynchronously and need to be run inside a asyncio loop to run without errors
+#     asyncio.run(generate_speech())
